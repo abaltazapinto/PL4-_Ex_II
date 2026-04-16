@@ -45,14 +45,10 @@ static void gpio_set_alt0(volatile uint32_t *gpfsel, int pin)
 
 int main(int argc, char **argv)
 {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <0..255>\n", argv[0]);
-        return 1;
-    }
+    int duty = 128;   // valor inicial por defeito
 
-    int duty = atoi(argv[1]);
-    if (duty < 0) duty = 0;
-    if (duty > 255) duty = 255;
+    if (argc == 2)
+        duty = clamp_duty(atoi(argv[1]));
 
     int fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (fd < 0) {
@@ -72,11 +68,12 @@ int main(int argc, char **argv)
     }
 
     bcm2711_gpio_registers_t *gpio = (bcm2711_gpio_registers_t *)gpio_map;
-    bcm2711_pwm_registers_t  *pwm  = (bcm2711_pwm_registers_t *)pwm_map;
+    bcm2711_pwm_registers_t  *pwm  = (bcm2711_pwm_registers_t  *)pwm_map;
 
     // GPIO12 -> ALT0 -> PWM0
     gpio_set_alt0(gpio->GPFSEL, 12);
 
+    // init PWM
     pwm->CONTROL = 0;
     usleep(10);
 
@@ -93,13 +90,40 @@ int main(int argc, char **argv)
     usleep(10);
 
     printf("PWM set on GPIO12: %d/255\n", duty);
-    printf("GPFSEL1 = 0x%08X\n", gpio->GPFSEL[1]);
-    printf("PWM CTL  = 0x%08X\n", pwm->CONTROL);
-    printf("PWM STA  = 0x%08X\n", pwm->STATUS);
-    printf("PWM RNG1 = %u\n", pwm->CHN0_RANGE);
-    printf("PWM DAT1 = %u\n", pwm->CHN0_DATA);
 
-    while (1) pause();
+    while (1) {
+        printf("PWM set on GPIO12: %d/255\n", duty);
+        printf("GPFSEL1 = 0x%08X\n", gpio->GPFSEL[1]);
+        printf("PWM CTL  = 0x%08X\n", pwm->CONTROL);
+        printf("PWM STA  = 0x%08X\n", pwm->STATUS);
+        printf("PWM RNG1 = %u\n", pwm->CHN0_RANGE);
+        printf("PWM DAT1 = %u\n", pwm->CHN0_DATA);
+        
+        int new_duty;
+
+        printf("Duty cycle (0..255, -1 para sair): ");
+        fflush(stdout);
+
+        if (scanf("%d", &new_duty) != 1)
+            break;
+
+        if (new_duty == -1)
+            break;
+
+        new_duty = clamp_duty(new_duty);
+
+        pwm->CHN0_DATA = (uint32_t)new_duty;
+        usleep(10);
+
+        printf("PWM set on GPIO12: %d/255\n", new_duty);
+    }
+
+    pwm->CONTROL = 0;
+    usleep(10);
+
+    munmap((void *)gpio, BLOCK_SIZE);
+    munmap((void *)pwm, BLOCK_SIZE);
+    close(fd);
 
     return 0;
 }
