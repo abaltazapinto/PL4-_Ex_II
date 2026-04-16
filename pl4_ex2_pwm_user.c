@@ -100,7 +100,12 @@ int main(int argc, char **argv)
     usleep(10);
 
     printf("PWM set on GPIO12: %d/255\n", duty);
-
+    printf("GPFSEL1 = 0x%08X\n", gpio->GPFSEL[1]);
+    printf("PWM CTL  = 0x%08X\n", pwm->CONTROL);
+    printf("PWM STA  = 0x%08X\n", pwm->STATUS);
+    printf("PWM RNG1 = %u\n", pwm->CHN0_RANGE);
+    printf("PWM DAT1 = %u\n", pwm->CHN0_DATA);
+    
     while (1) {
         int new_duty;
 
