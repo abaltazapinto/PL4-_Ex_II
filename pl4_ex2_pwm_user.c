@@ -42,7 +42,12 @@ static void gpio_set_alt0(volatile uint32_t *gpfsel, int pin)
     v |=  (0x4u << shift);   // ALT0 = 100
     gpfsel[reg] = v;
 }
-
+static int clamp_duty(int v)
+{
+    if (v < 0) return 0;
+    if (v > 255) return 255;
+    return v;
+}
 int main(int argc, char **argv)
 {
     int duty = 128;   // valor inicial por defeito
@@ -98,7 +103,7 @@ int main(int argc, char **argv)
         printf("PWM STA  = 0x%08X\n", pwm->STATUS);
         printf("PWM RNG1 = %u\n", pwm->CHN0_RANGE);
         printf("PWM DAT1 = %u\n", pwm->CHN0_DATA);
-        
+
         int new_duty;
 
         printf("Duty cycle (0..255, -1 para sair): ");
