@@ -43,19 +43,16 @@ static void gpio_set_alt0(volatile uint32_t *gpfsel, int pin)
     gpfsel[reg] = v;
 }
 
-static int clamp_duty(int v)
-{
-    if (v < 0) return 0;
-    if (v > 255) return 255;
-    return v;
-}
-
 int main(int argc, char **argv)
 {
-    int duty = 128;   // valor inicial por defeito
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <0..255>\n", argv[0]);
+        return 1;
+    }
 
-    if (argc == 2)
-        duty = clamp_duty(atoi(argv[1]));
+    int duty = atoi(argv[1]);
+    if (duty < 0) duty = 0;
+    if (duty > 255) duty = 255;
 
     int fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (fd < 0) {
@@ -75,27 +72,23 @@ int main(int argc, char **argv)
     }
 
     bcm2711_gpio_registers_t *gpio = (bcm2711_gpio_registers_t *)gpio_map;
-    bcm2711_pwm_registers_t  *pwm  = (bcm2711_pwm_registers_t  *)pwm_map;
+    bcm2711_pwm_registers_t  *pwm  = (bcm2711_pwm_registers_t *)pwm_map;
 
     // GPIO12 -> ALT0 -> PWM0
     gpio_set_alt0(gpio->GPFSEL, 12);
 
-    // Desligar PWM antes de configurar
     pwm->CONTROL = 0;
     usleep(10);
 
-    // Limpar flags de estado antigas
     pwm->STATUS = 0xFFFFFFFFu;
     usleep(10);
 
-    // 256 níveis
     pwm->CHN0_RANGE = 255;
     usleep(10);
 
     pwm->CHN0_DATA = (uint32_t)duty;
     usleep(10);
 
-    // Ativar PWM channel 0 (PWEN1 bit 0)
     pwm->CONTROL = 0x1;
     usleep(10);
 
@@ -105,32 +98,8 @@ int main(int argc, char **argv)
     printf("PWM STA  = 0x%08X\n", pwm->STATUS);
     printf("PWM RNG1 = %u\n", pwm->CHN0_RANGE);
     printf("PWM DAT1 = %u\n", pwm->CHN0_DATA);
-    
-    while (1) {
-        int new_duty;
 
-        printf("Duty cycle (0..255, -1 para sair): ");
-        fflush(stdout);
-
-        if (scanf("%d", &new_duty) != 1)
-            break;
-
-        if (new_duty == -1)
-            break;
-
-        new_duty = clamp_duty(new_duty);
-        pwm->CHN0_DATA = (uint32_t)new_duty;
-        usleep(10);
-
-        printf("PWM set on GPIO12: %d/255\n", new_duty);
-    }
-
-    pwm->CONTROL = 0;
-    usleep(10);
-
-    munmap((void *)gpio, BLOCK_SIZE);
-    munmap((void *)pwm, BLOCK_SIZE);
-    close(fd);
+    while (1) pause();
 
     return 0;
 }
